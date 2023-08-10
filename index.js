@@ -80,6 +80,20 @@ async function run() {
   res.send({ token });
 });
 
+//warning: use verify jwt before using verify member
+const verifyadmin = async (req, res, next) => {
+  const email = req.decoded.email;
+  const query = { email: email };
+  const user = await memberCollection.findOne(query);
+
+  if (user?.role !== "admin") {
+    return res
+      .status(403)
+      .send({ error: true, message: "Forbidden message" });
+  }
+  next();
+};
+
 
 //warning: use verify jwt before using verify member
     const verifyMember = async (req, res, next) => {
@@ -108,7 +122,7 @@ app.get('/users/member/:email',verifyJWT, async (req, res) => {
   }
   const query = { email: email }
   const user = await memberCollection.findOne(query);
-  const result = { member: user?.role === 'member' }
+  const result = { member: user?.role === 'approved' }
   res.send(result);
 })
 
@@ -197,14 +211,26 @@ if (existingUser) {
 
 app.get('/member', async (req, res) => {
  const filter = req.query ;
+ let query ={}
  if (filter && filter.email) {
-  query = { email: filter.email };
+  query = { email: filter.email }
 }
-console.log(query);
+query.role ={ $ne:"subscriber" }
+
 const result = await memberCollection.find(query).toArray() ;
   res.send(result);
 
 })
+
+
+//delete Member 
+app.delete('/deleteMember/:id', async (req,res)=>{
+  const id= req.params.id ;
+  const filter = {_id : new ObjectId(id)}
+  const result= await memberCollection.deleteOne(filter) ;
+  res.send(result) ;
+})
+
 
 
 //update Member Info 
@@ -212,23 +238,22 @@ app.put("/userInfo/:email", async (req, res) => {
   const email = req.params.email;
  
 const query = { email: email };
+const user = await memberCollection.findOne(query);
 
- const user = await memberCollection.findOne(query);
- const filter=  user
-console.log(filter);
+console.log('the info', query);
   const data = req.body;
   const option = { upsert: true };
   const updateDoc = {
     $set: {
-    fullname: data.fullname,
-    department: data.department,
-    batch: data.batch,
-    session: data.session,
-    studentID: data.studentID,
+    fullname: data?.fullname || user.fullname ,
+    department: data?.department || user.fullname,
+    batch: data?.batch || user.batch,
+    session: data?.session || user.session,
+    studentID: data?.studentID || user.studentID  ,
     },
   };
   const result = await memberCollection.updateOne(
-    filter,
+    query,
     updateDoc,
     option
   );
@@ -240,24 +265,24 @@ app.put("/userContact/:email", async (req, res) => {
   const email = req.params.email;
  
 const query = { email: email };
+const user = await memberCollection.findOne(query);
 
- const user = await memberCollection.findOne(query);
- const filter=  user
-console.log(filter);
+console.log('the info', query);
   const data = req.body;
   const option = { upsert: true };
   const updateDoc = {
     $set: {
-    mobile: data.mobile,
-    fulladdress: data.fulladdress,
-    },
+      mobile: data?.mobile || user?.mobile,
+      fulladdress: data?.fulladdress || user?.fulladdress,
+      },
   };
   const result = await memberCollection.updateOne(
-    filter,
+    query,
     updateDoc,
     option
   );
   res.send(result);
+
 });
 //update soocial 
 
@@ -265,9 +290,6 @@ console.log(filter);
 app.put("/userSocial/:email", async (req, res) => {
   const email = req.params.email;
  
-const query = { email: email };
-
-
   const newSocialLinks = req.body;
   const result = await memberCollection.findOneAndUpdate(
     { email: email },
@@ -281,6 +303,27 @@ const query = { email: email };
   res.json({ message: 'Social links updated successfully', document: result.value });
 
 });
+
+//update member role 
+app.put("/member/updateRole/:email", async (req, res) => {
+const email = req.params.email;
+const updateRole = req.body.role ;
+const query = { email: email };
+  const option = { upsert: true };
+  const updateDoc = {
+    $set: {
+      role: updateRole ,
+      },
+  };
+  const result = await memberCollection.updateOne(
+    query,
+    updateDoc,
+    option
+  );
+  res.send(result);
+
+});
+
 
 
 
